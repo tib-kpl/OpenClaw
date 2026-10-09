@@ -131,7 +131,7 @@ jobs:
 
             - **Windows**: extract the zip, copy `CLAW.REZ` next to `openclaw.exe` and run it.
             - **Linux**: install SDL2 (`sudo apt install libsdl2-2.0-0 libsdl2-image-2.0-0 libsdl2-mixer-2.0-0 libsdl2-ttf-2.0-0 libsdl2-gfx-1.0-0`), extract, copy `CLAW.REZ` next to `openclaw` and launch `run.sh`.
-            - **Android**: install the APK and launch it once, then copy `CLAW.REZ` to `Android/data/com.openclaw.game/files/` (e.g. over USB from a PC) and launch again.
+            - **Android**: install the APK and launch it, it asks you to select `CLAW.REZ` (put it in Downloads first for example) and copies it.
           files: |
             OpenClaw-windows-x86.zip
             OpenClaw-linux-x86_64.tar.gz

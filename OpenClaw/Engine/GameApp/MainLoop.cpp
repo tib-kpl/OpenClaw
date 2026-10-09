@@ -13,6 +13,38 @@
 
 #ifdef __ANDROID__
 #include <unistd.h>
+#include <jni.h>
+
+// Lets the user pick a file with the system file picker and copies it to destinationPath
+// (see OpenClawActivity.importGameFile)
+static bool ImportAndroidFile(const std::string& destinationPath)
+{
+    JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+    jobject activity = (jobject)SDL_AndroidGetActivity();
+    if (env == NULL || activity == NULL)
+    {
+        return false;
+    }
+
+    bool success = false;
+    jclass activityClass = env->GetObjectClass(activity);
+    jmethodID importMethod = env->GetStaticMethodID(activityClass, "importGameFile", "(Ljava/lang/String;)Z");
+    if (importMethod != NULL)
+    {
+        jstring jPath = env->NewStringUTF(destinationPath.c_str());
+        success = env->CallStaticBooleanMethod(activityClass, importMethod, jPath);
+        env->DeleteLocalRef(jPath);
+    }
+    if (env->ExceptionCheck())
+    {
+        env->ExceptionClear();
+        success = false;
+    }
+
+    env->DeleteLocalRef(activityClass);
+    env->DeleteLocalRef(activity);
+    return success;
+}
 
 // Copies a file packaged in the APK assets into the current directory
 static bool ExtractAndroidAsset(const char* fileName, bool overwrite)
@@ -77,10 +109,17 @@ int RunGameEngine(int argc, char** argv)
 
     if (!TryToFindFile("CLAW.REZ"))
     {
-        std::string message = "CLAW.REZ from the original Captain Claw game was not found.\n\n"
-            "Copy it to:\n" + userDirectory;
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenClaw", message.c_str(), NULL);
-        return -1;
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "OpenClaw",
+            "CLAW.REZ from the original Captain Claw game is required.\n\n"
+            "Select it in the next screen, it will be copied into the game folder.", NULL);
+
+        if (!ImportAndroidFile(userDirectory + "CLAW.REZ"))
+        {
+            std::string message = "CLAW.REZ was not imported.\n\n"
+                "Restart the game to select it again, or copy it to:\n" + userDirectory;
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenClaw", message.c_str(), NULL);
+            return -1;
+        }
     }
 #elif defined(__WINDOWS__)
     userDirectory = "";

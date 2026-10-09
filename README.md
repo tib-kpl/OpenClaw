@@ -77,8 +77,8 @@ Zip all content inside `Build_Release/ASSETS` directory to `ASSETS.ZIP` file.
   ./gradlew assembleRelease     # APK in android/app/build/outputs/apk/release/
   ```
 
-  **Running:** install the APK and launch it once, then copy `CLAW.REZ` to
-  `Android/data/com.openclaw.game/files/` on the device (e.g. over USB from a PC) and launch it again.
+  **Running:** install the APK and launch it. On first launch it asks for `CLAW.REZ` from the original game
+  (select it from Downloads, SD card, Drive...) and copies it into `Android/data/com.openclaw.game/files/`.
 
   Prebuilt APKs (as well as Windows and Linux builds) are attached to [GitHub releases](../../releases).
   A new release is published automatically for every commit pushed to `master`.
