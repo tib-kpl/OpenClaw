@@ -3,7 +3,6 @@ name: Build
 on:
   push:
     branches: [master]
-    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -99,8 +98,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          VERSION_NAME="${GITHUB_REF_NAME#v}"
-          if [ "$GITHUB_REF_TYPE" != "tag" ]; then VERSION_NAME="dev-${GITHUB_SHA::7}"; fi
+          VERSION_NAME="build-${{ github.run_number }}"
           ./gradlew assembleRelease --no-daemon \
             -PappVersionCode=${{ github.run_number }} -PappVersionName="$VERSION_NAME"
           cp app/build/outputs/apk/release/app-release.apk ../OpenClaw-android.apk
@@ -110,8 +108,9 @@ jobs:
           name: android
           path: OpenClaw-android.apk
 
+  # Every push to master publishes a new release
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: [linux, windows, android]
     runs-on: ubuntu-latest
     steps:
@@ -121,6 +120,10 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: build-${{ github.run_number }}
+          name: OpenClaw build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           generate_release_notes: true
           body: |
             **CLAW.REZ from the original Captain Claw game is required and not included.**

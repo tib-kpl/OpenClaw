@@ -81,7 +81,7 @@ Zip all content inside `Build_Release/ASSETS` directory to `ASSETS.ZIP` file.
   `Android/data/com.openclaw.game/files/` on the device (e.g. over USB from a PC) and launch it again.
 
   Prebuilt APKs (as well as Windows and Linux builds) are attached to [GitHub releases](../../releases).
-  A release is created by pushing a `v*` tag, e.g. `git tag v1.0.0 && git push origin v1.0.0`.
+  A new release is published automatically for every commit pushed to `master`.
   
 ### WebAssembly (Emscripten)
   

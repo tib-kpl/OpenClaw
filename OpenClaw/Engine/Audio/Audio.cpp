@@ -17,6 +17,48 @@
 #undef PlaySound
 #endif
 
+#ifdef __ANDROID__
+#include <jni.h>
+#include <cstdarg>
+
+// SDL_mixer cannot play MIDI on Android without sound patches, so the music
+// is played by the MIDI synthesizer built into Android (see OpenClawActivity.java)
+static void CallAndroidMusic(const char* method, const char* signature, ...)
+{
+    JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+    jobject activity = (jobject)SDL_AndroidGetActivity();
+    if (env == NULL || activity == NULL)
+    {
+        return;
+    }
+
+    // Class of the activity object is used because FindClass() cannot find
+    // application classes from native threads
+    jclass activityClass = env->GetObjectClass(activity);
+    jmethodID methodId = env->GetStaticMethodID(activityClass, method, signature);
+    if (methodId != NULL)
+    {
+        va_list args;
+        va_start(args, signature);
+        env->CallStaticVoidMethodV(activityClass, methodId, args);
+        va_end(args);
+    }
+    if (env->ExceptionCheck())
+    {
+        env->ExceptionClear();
+    }
+
+    env->DeleteLocalRef(activityClass);
+    env->DeleteLocalRef(activity);
+}
+
+static float GetAndroidMusicVolume(int mixVolume)
+{
+    // Music volume is 0-20 % of MIX_MAX_VOLUME, 10 % and more is full volume
+    return std::min(1.0f, (float)mixVolume / (MIX_MAX_VOLUME * 0.1f));
+}
+#endif
+
 using namespace std;
 
 const uint32_t MIDI_RPC_MAX_HANDSHAKE_TRIES = 250;
@@ -154,6 +196,19 @@ static int SetupPlayMusicThread(void* pData)
         //__LOG_ERROR("Audio::SetMusicVolume: Failed due to RPC exception");
     }
     RpcEndExcept;
+#elif defined(__ANDROID__)
+    // MediaPlayer can only play files
+    std::string musicPath = std::string(SDL_AndroidGetInternalStoragePath()) + "/music.mid";
+    {
+        std::ofstream musicFile(musicPath.c_str(), std::ios::binary | std::ios::trunc);
+        musicFile.write(pMusicInfo->pMusicData, pMusicInfo->musicSize);
+    }
+
+    JNIEnv* env = (JNIEnv*)SDL_AndroidGetJNIEnv();
+    jstring jMusicPath = env->NewStringUTF(musicPath.c_str());
+    CallAndroidMusic("playMusic", "(Ljava/lang/String;ZZ)V", jMusicPath,
+        (jboolean)pMusicInfo->looping, (jboolean)(pMusicInfo->musicVolume == -1));
+    env->DeleteLocalRef(jMusicPath);
 #else
     SDL_RWops* pRWops = SDL_RWFromMem((void*)pMusicInfo->pMusicData, pMusicInfo->musicSize);
     Mix_Music* pMusic = Mix_LoadMUS_RW(pRWops, 0);
@@ -198,6 +253,8 @@ void Audio::PauseMusic()
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Audio::PauseMusic: Failed due to RPC exception");
     }
     RpcEndExcept
+#elif defined(__ANDROID__)
+    CallAndroidMusic("pauseMusic", "()V");
 #else
     Mix_PauseMusic();
 #endif //_WIN32
@@ -216,6 +273,8 @@ void Audio::ResumeMusic()
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Audio::ResumeMusic: Failed due to RPC exception");
     }
     RpcEndExcept
+#elif defined(__ANDROID__)
+    CallAndroidMusic("resumeMusic", "()V");
 #else
     Mix_ResumeMusic();
 #endif //_WIN32
@@ -233,6 +292,8 @@ void Audio::StopMusic()
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "AudioMgr::StopMusic: Failed due to RPC exception");
     }
     RpcEndExcept
+#elif defined(__ANDROID__)
+    CallAndroidMusic("stopMusic", "()V");
 #else
     Mix_HaltMusic();
 #endif //_WIN32
@@ -258,6 +319,8 @@ void Audio::SetMusicVolume(int volumePercentage)
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "AudioMgr::SetMusicVolume: Failed due to RPC exception");
     }
     RpcEndExcept
+#elif defined(__ANDROID__)
+    CallAndroidMusic("setMusicVolume", "(F)V", (jdouble)GetAndroidMusicVolume(m_MusicVolume));
 #else
     Mix_VolumeMusic(m_MusicVolume);
 #endif //_WIN32
