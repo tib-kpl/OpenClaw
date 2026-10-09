@@ -282,10 +282,112 @@ int32 BaseGameApp::Run()
     return 0;
 }
 
+//---------------------------------------------------------------------------------------------------------------------
+// Game controller support
+//
+// Controller input is translated into the keyboard keys used by the game and its menus
+//---------------------------------------------------------------------------------------------------------------------
+static void PushKeyEvent(SDL_Keycode key, bool pressed)
+{
+    SDL_Event keyEvent;
+    SDL_zero(keyEvent);
+    keyEvent.type = pressed ? SDL_KEYDOWN : SDL_KEYUP;
+    keyEvent.key.state = pressed ? SDL_PRESSED : SDL_RELEASED;
+    keyEvent.key.keysym.sym = key;
+    keyEvent.key.keysym.scancode = SDL_GetScancodeFromKey(key);
+    SDL_PushEvent(&keyEvent);
+}
+
+static void OnGameControllerButton(uint8_t button, bool pressed)
+{
+    switch (button)
+    {
+        case SDL_CONTROLLER_BUTTON_DPAD_LEFT:  PushKeyEvent(SDLK_LEFT, pressed); break;
+        case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: PushKeyEvent(SDLK_RIGHT, pressed); break;
+        case SDL_CONTROLLER_BUTTON_DPAD_UP:    PushKeyEvent(SDLK_UP, pressed); break;
+        case SDL_CONTROLLER_BUTTON_DPAD_DOWN:  PushKeyEvent(SDLK_DOWN, pressed); break;
+        // Jump in game, confirm in menus
+        case SDL_CONTROLLER_BUTTON_A:
+            PushKeyEvent(SDLK_SPACE, pressed);
+            PushKeyEvent(SDLK_RETURN, pressed);
+            break;
+        case SDL_CONTROLLER_BUTTON_B:          PushKeyEvent(SDLK_LALT, pressed); break;   // Fire
+        case SDL_CONTROLLER_BUTTON_X:          PushKeyEvent(SDLK_LCTRL, pressed); break;  // Attack
+        case SDL_CONTROLLER_BUTTON_Y:          PushKeyEvent(SDLK_LSHIFT, pressed); break; // Change ammo
+        case SDL_CONTROLLER_BUTTON_START:
+        case SDL_CONTROLLER_BUTTON_BACK:       PushKeyEvent(SDLK_ESCAPE, pressed); break; // Pause / back
+        default: break;
+    }
+}
+
+static void OnGameControllerAxis(uint8_t axis, int16_t value)
+{
+    // Left stick acts as the D-pad
+    const int16_t threshold = 16000;
+    static int8_t s_StickX = 0, s_StickY = 0;
+
+    int8_t* pDirection;
+    SDL_Keycode negativeKey, positiveKey;
+    if (axis == SDL_CONTROLLER_AXIS_LEFTX)
+    {
+        pDirection = &s_StickX;
+        negativeKey = SDLK_LEFT;
+        positiveKey = SDLK_RIGHT;
+    }
+    else if (axis == SDL_CONTROLLER_AXIS_LEFTY)
+    {
+        pDirection = &s_StickY;
+        negativeKey = SDLK_UP;
+        positiveKey = SDLK_DOWN;
+    }
+    else
+    {
+        return;
+    }
+
+    int8_t direction = value < -threshold ? -1 : (value > threshold ? 1 : 0);
+    if (direction == *pDirection)
+    {
+        return;
+    }
+
+    if (*pDirection != 0)
+    {
+        PushKeyEvent(*pDirection < 0 ? negativeKey : positiveKey, false);
+    }
+    if (direction != 0)
+    {
+        PushKeyEvent(direction < 0 ? negativeKey : positiveKey, true);
+    }
+    *pDirection = direction;
+}
+
 void BaseGameApp::OnEvent(SDL_Event& event)
 {
     switch (event.type)
     {
+        case SDL_CONTROLLERDEVICEADDED:
+        {
+            if (SDL_GameControllerOpen(event.cdevice.which) != NULL)
+            {
+                LOG("Game controller connected: " + std::string(SDL_GameControllerNameForIndex(event.cdevice.which)));
+            }
+            break;
+        }
+
+        case SDL_CONTROLLERBUTTONDOWN:
+        case SDL_CONTROLLERBUTTONUP:
+        {
+            OnGameControllerButton(event.cbutton.button, event.type == SDL_CONTROLLERBUTTONDOWN);
+            break;
+        }
+
+        case SDL_CONTROLLERAXISMOTION:
+        {
+            OnGameControllerAxis(event.caxis.axis, event.caxis.value);
+            break;
+        }
+
         case SDL_QUIT:
         case SDL_APP_TERMINATING:
         {
@@ -774,7 +876,7 @@ bool BaseGameApp::InitializeDisplay(GameOptions& gameOptions)
 {
     LOG(">>>>> Initializing display...");
 
-    if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_VIDEO) != 0)
+    if (SDL_Init(SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) != 0)
     {
         LOG_ERROR("Failed to initialize SDL2 library. Error: %s" + std::string(SDL_GetError()));
         return false;

@@ -58,7 +58,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist/OpenClaw | Out-Null
-          Get-ChildItem Build_Release -Recurse -Include openclaw.exe, MidiProc.exe | Copy-Item -Destination dist/OpenClaw/
+          # Freshly built binaries (Build_Release also contains an old prebuilt OpenClaw.exe)
+          Copy-Item Build_Release/Release/openclaw.exe, Build_Release/Release/MidiProc.exe dist/OpenClaw/
           Copy-Item Build_Release/*.dll dist/OpenClaw/
           foreach ($f in $env:GAME_DATA.Split(' ')) { Copy-Item "Build_Release/$f" dist/OpenClaw/ }
           Compress-Archive -Path dist/OpenClaw -DestinationPath OpenClaw-windows-x86.zip
