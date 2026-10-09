@@ -102,6 +102,8 @@ void BaseGameApp::Terminate()
     RemoveAllDelegates();
 
     SAFE_DELETE(m_pGame);
+    SaveGameOptions();
+
     SDL_DestroyRenderer(m_pRenderer);
     SDL_DestroyWindow(m_pWindow);
     SAFE_DELETE(m_pAudio);
@@ -117,8 +119,6 @@ void BaseGameApp::Terminate()
         delete actorProto.second;
     }
     m_ActorXmlPrototypeMap.clear();
-
-    SaveGameOptions();
 }
 
 #define STARTUP_TEST(condition, error) \
@@ -830,10 +830,55 @@ bool BaseGameApp::LoadGameOptions(const char* inConfigFile)
     return true;
 }
 
+static void SetXmlChildText(TiXmlElement* pParent, const char* name, const std::string& value)
+{
+    TiXmlElement* pElem = pParent->FirstChildElement(name);
+    if (pElem == NULL)
+    {
+        pElem = new TiXmlElement(name);
+        pParent->LinkEndChild(pElem);
+    }
+    pElem->Clear();
+    pElem->LinkEndChild(new TiXmlText(value.c_str()));
+}
+
 void BaseGameApp::SaveGameOptions(const char* outConfigFile)
 {
-    LOG_ERROR("Not implemented yet!");
-    return;
+    // Only audio options can be changed in game, update them in the existing config file
+    if (m_pAudio == NULL)
+    {
+        return;
+    }
+
+    m_GameOptions.soundVolume = m_pAudio->GetSoundVolume();
+    m_GameOptions.musicVolume = m_pAudio->GetMusicVolume();
+    m_GameOptions.soundOn = m_pAudio->IsSoundActive();
+    m_GameOptions.musicOn = m_pAudio->IsMusicActive();
+
+    std::string configPath = m_GameOptions.userDirectory + outConfigFile;
+    TiXmlDocument configDoc(configPath.c_str());
+    if (!configDoc.LoadFile() || configDoc.RootElement() == NULL)
+    {
+        LOG_ERROR("Failed to load config file for saving options: " + configPath);
+        return;
+    }
+
+    TiXmlElement* pAudioElem = configDoc.RootElement()->FirstChildElement("Audio");
+    if (pAudioElem == NULL)
+    {
+        pAudioElem = new TiXmlElement("Audio");
+        configDoc.RootElement()->LinkEndChild(pAudioElem);
+    }
+
+    SetXmlChildText(pAudioElem, "SoundVolume", ToStr(m_GameOptions.soundVolume));
+    SetXmlChildText(pAudioElem, "MusicVolume", ToStr(m_GameOptions.musicVolume));
+    SetXmlChildText(pAudioElem, "SoundOn", m_GameOptions.soundOn ? "true" : "false");
+    SetXmlChildText(pAudioElem, "MusicOn", m_GameOptions.musicOn ? "true" : "false");
+
+    if (!configDoc.SaveFile())
+    {
+        LOG_ERROR("Failed to save options to: " + configPath);
+    }
 }
 
 //=====================================================================================================================

@@ -792,6 +792,8 @@ void HumanView::SetVolumeDelegate(IEventDataPtr pEventData)
                 g_pApp->GetAudio()->SetSoundVolume(pCastEventData->GetVolume());
             }
         }
+
+        g_pApp->SaveGameOptions();
     }
 }
 
@@ -810,6 +812,8 @@ void HumanView::SoundEnabledChangedDelegate(IEventDataPtr pEventData)
         {
             g_pApp->GetAudio()->SetSoundActive(pCastEventData->GetIsEnabled());
         }
+
+        g_pApp->SaveGameOptions();
     }
 }
 

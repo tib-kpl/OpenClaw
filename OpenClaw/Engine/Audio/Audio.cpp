@@ -54,8 +54,10 @@ static void CallAndroidMusic(const char* method, const char* signature, ...)
 
 static float GetAndroidMusicVolume(int mixVolume)
 {
-    // Music volume is 0-20 % of MIX_MAX_VOLUME, 10 % and more is full volume
-    return std::min(1.0f, (float)mixVolume / (MIX_MAX_VOLUME * 0.1f));
+    // Music volume is 0-20 % of MIX_MAX_VOLUME (same knob range as 0-100 % of sounds).
+    // Android MIDI synthesizer is much louder than sound effects, so it is attenuated.
+    const float musicToSoundRatio = 0.5f;
+    return std::min(1.0f, (float)mixVolume / (MIX_MAX_VOLUME * 0.2f)) * musicToSoundRatio;
 }
 #endif
 
@@ -125,8 +127,9 @@ bool Audio::Initialize(const GameOptions& config)
 
     m_SoundVolume = config.soundVolume;
     m_MusicVolume = config.musicVolume;
-    m_bSoundOn = config.soundOn;
-    m_bMusicOn = config.musicOn;
+    // Enabled by default, SetSoundActive/SetMusicActive below apply the configured state
+    m_bSoundOn = true;
+    m_bMusicOn = true;
 
 #ifdef _WIN32
     m_bIsMidiRpcInitialized = InitializeMidiRPC(config.midiRpcServerPath);
@@ -139,8 +142,8 @@ bool Audio::Initialize(const GameOptions& config)
     SetSoundVolume(m_SoundVolume);
     SetMusicVolume(m_MusicVolume);
 
-    SetSoundActive(m_bSoundOn);
-    SetMusicActive(m_bMusicOn);
+    SetSoundActive(config.soundOn);
+    SetMusicActive(config.musicOn);
 
     m_bIsAudioInitialized = true;
 
