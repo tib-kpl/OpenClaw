@@ -799,6 +799,13 @@ bool BaseGameApp::InitializeDisplay(GameOptions& gameOptions)
         SDL_GetWindowSize(m_pWindow, &m_GameOptions.windowWidth, &m_GameOptions.windowHeight);
     }
 
+#ifdef __ANDROID__
+    // Window always covers the whole screen, scale it so that the visible
+    // area is about as high as in the original 640x480 game
+    SDL_GetWindowSize(m_pWindow, &m_GameOptions.windowWidth, &m_GameOptions.windowHeight);
+    m_GameOptions.scale = max(1.0, m_GameOptions.windowHeight / 480.0);
+#endif
+
     m_WindowSize.Set(gameOptions.windowWidth, gameOptions.windowHeight);
 
     uint32 rendererFlags = SDL_RENDERER_ACCELERATED;

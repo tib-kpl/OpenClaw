@@ -70,7 +70,18 @@ Zip all content inside `Build_Release/ASSETS` directory to `ASSETS.ZIP` file.
   
 ### Android
   
-  - Compilation / Deployment steps will be updated in near future, game itself is successfully running on Android
+  **Compilation** (requires Android SDK with NDK 25.2.9519653 and CMake 3.22.1, JDK 17):
+  ```shell script
+  sh android/fetch-deps.sh      # downloads SDL2, SDL2_image, SDL2_mixer, SDL2_ttf and SDL2_gfx sources
+  cd android
+  ./gradlew assembleRelease     # APK in android/app/build/outputs/apk/release/
+  ```
+
+  **Running:** install the APK and launch it once, then copy `CLAW.REZ` to
+  `Android/data/com.openclaw.game/files/` on the device (e.g. over USB from a PC) and launch it again.
+
+  Prebuilt APKs (as well as Windows and Linux builds) are attached to [GitHub releases](../../releases).
+  A release is created by pushing a `v*` tag, e.g. `git tag v1.0.0 && git push origin v1.0.0`.
   
 ### WebAssembly (Emscripten)
   

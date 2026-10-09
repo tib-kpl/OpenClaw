@@ -1,0 +1,95 @@
+plugins {
+    id 'com.android.application'
+}
+
+def depsDir = file("${rootDir}/deps")
+def repoDir = file("${rootDir}/..")
+def gameDataDir = file("${repoDir}/Build_Release")
+def generatedAssetsDir = layout.buildDirectory.dir("generated/gameAssets")
+
+// Release signing is configured through environment variables (used by CI).
+// Without them, the release APK is signed with the debug key.
+def keystoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
+def hasReleaseKey = keystoreFile != null && file(keystoreFile).exists()
+
+android {
+    namespace 'com.openclaw.game'
+    compileSdk 35
+    ndkVersion '25.2.9519653'
+
+    defaultConfig {
+        applicationId 'com.openclaw.game'
+        minSdk 21
+        targetSdk 35
+        versionCode = (project.findProperty('appVersionCode') ?: '1') as int
+        versionName = project.findProperty('appVersionName') ?: 'dev'
+
+        externalNativeBuild {
+            cmake {
+                arguments '-DAndroid=ON', '-DANDROID_STL=c++_shared'
+                targets 'openclaw'
+            }
+        }
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+        }
+    }
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            release {
+                storeFile file(keystoreFile)
+                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "${repoDir}/CMakeLists.txt"
+            version '3.22.1'
+        }
+    }
+
+    sourceSets {
+        main {
+            // SDLActivity and friends come from the SDL2 sources
+            java.srcDirs += "${depsDir}/SDL2/android-project/app/src/main/java"
+            assets.srcDirs += generatedAssetsDir
+        }
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+// Game data packaged in the APK, extracted at first launch (see MainLoop.cpp).
+// CLAW.REZ is not included, the user has to provide it.
+def copyGameAssets = tasks.register('copyGameAssets', Copy) {
+    from(gameDataDir) {
+        include 'ASSETS.ZIP', 'clacon.ttf', 'console02.tga', 'SAVES.XML', 'config.xml'
+    }
+    into generatedAssetsDir
+    // Android window always covers the whole screen
+    filesMatching('config.xml') {
+        filter { line -> line.replace('<IsFullscreenDesktop>false</IsFullscreenDesktop>', '<IsFullscreenDesktop>true</IsFullscreenDesktop>') }
+    }
+}
+
+preBuild.dependsOn copyGameAssets
+
+preBuild.doFirst {
+    if (!file("${depsDir}/SDL2/CMakeLists.txt").exists()) {
+        throw new GradleException("SDL2 sources not found. Run android/fetch-deps.sh first.")
+    }
+}

@@ -25,12 +25,72 @@ if (WIN32)
     add_subdirectory(MidiProc)
 endif (WIN32)
 
-#if(Android)
-#    add_subdirectory(./ThirdParty/SDL2-2.0.5)
-#    include_directories(./ThirdParty/SDL2-2.0.5/include/)
-#    link_directories(./ThirdParty/SDL2-2.0.5/libs/armeabi/)
-#    add_subdirectory(./ThirdParty/SDL2_gfx-1.0.1)
-#endif(Android)
+# Android: SDL2 libraries are built from sources fetched by android/fetch-deps.sh
+if(Android)
+    set(ANDROID_DEPS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android/deps")
+    if(NOT EXISTS "${ANDROID_DEPS_DIR}/SDL2/CMakeLists.txt")
+        message(FATAL_ERROR "SDL2 sources not found. Run android/fetch-deps.sh first.")
+    endif()
+
+    # SDL2 itself must be a shared library (loaded by SDLActivity),
+    # satellite libraries are linked statically into libopenclaw.so
+    set(SDL_SHARED ON CACHE BOOL "" FORCE)
+    set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+    set(SDL_TEST OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${ANDROID_DEPS_DIR}/SDL2 ${CMAKE_BINARY_DIR}/deps/SDL2)
+    # Static satellite libraries look for this target
+    add_library(SDL2::SDL2-static ALIAS SDL2)
+
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+    set(SDL2IMAGE_VENDORED OFF CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_BACKEND_STB ON CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_AVIF OFF CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_JXL OFF CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_TIF OFF CACHE BOOL "" FORCE)
+    set(SDL2IMAGE_WEBP OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${ANDROID_DEPS_DIR}/SDL2_image ${CMAKE_BINARY_DIR}/deps/SDL2_image)
+
+    set(SDL2MIXER_VENDORED OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_SAMPLES OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_FLAC OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_GME OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_MOD OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_MP3 OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_OPUS OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_WAVPACK OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_MIDI_FLUIDSYNTH OFF CACHE BOOL "" FORCE)
+    set(SDL2MIXER_MIDI_TIMIDITY ON CACHE BOOL "" FORCE)
+    add_subdirectory(${ANDROID_DEPS_DIR}/SDL2_mixer ${CMAKE_BINARY_DIR}/deps/SDL2_mixer)
+
+    set(SDL2TTF_VENDORED ON CACHE BOOL "" FORCE)
+    set(SDL2TTF_SAMPLES OFF CACHE BOOL "" FORCE)
+    set(SDL2TTF_HARFBUZZ OFF CACHE BOOL "" FORCE)
+    add_subdirectory(${ANDROID_DEPS_DIR}/SDL2_ttf ${CMAKE_BINARY_DIR}/deps/SDL2_ttf)
+
+    set(SDL2_GFX_DIR ${ANDROID_DEPS_DIR}/SDL2_gfx)
+    add_library(SDL2_gfx STATIC
+        ${SDL2_GFX_DIR}/SDL2_framerate.c
+        ${SDL2_GFX_DIR}/SDL2_gfxPrimitives.c
+        ${SDL2_GFX_DIR}/SDL2_imageFilter.c
+        ${SDL2_GFX_DIR}/SDL2_rotozoom.c
+    )
+    target_link_libraries(SDL2_gfx PRIVATE SDL2::SDL2)
+
+    # The code includes <SDL2/xxx.h>, so gather all public headers into an SDL2/ folder.
+    # It must take precedence over the Windows headers in ThirdParty/SDL2.
+    set(SDL2_HEADERS_DIR ${CMAKE_BINARY_DIR}/sdl2_headers)
+    file(GLOB SDL2_PUBLIC_HEADERS
+        ${ANDROID_DEPS_DIR}/SDL2/include/*.h
+        ${ANDROID_DEPS_DIR}/SDL2_image/include/SDL_image.h
+        ${ANDROID_DEPS_DIR}/SDL2_mixer/include/SDL_mixer.h
+        ${ANDROID_DEPS_DIR}/SDL2_ttf/SDL_ttf.h
+        ${SDL2_GFX_DIR}/SDL2_*.h
+    )
+    file(COPY ${SDL2_PUBLIC_HEADERS} DESTINATION ${SDL2_HEADERS_DIR}/SDL2)
+    include_directories(BEFORE ${SDL2_HEADERS_DIR})
+endif(Android)
 
 # Directories with headers
 include_directories(./Box2D/)
@@ -50,7 +110,6 @@ if (WIN32)
 endif (WIN32)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ../Build_Release)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ../android/libs/armeabi-v7a)
 
 # Cmake target definitions
 if(Android)

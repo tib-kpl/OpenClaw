@@ -32,3 +32,11 @@ Build_Release/vim.exe.stackdump
 *.iobj
 *.ipdb
 *.exp
+
+# Android
+android/deps/
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
